@@ -1,0 +1,56 @@
+version: '2'
+
+services:
+  sample:
+    build:
+      context: ./sample-dc
+      dockerfile: php-fpm.dockerfile
+      args:
+        - UID
+        - GID
+    image: sample-dev-env
+    working_dir: /var/www/html
+    user: ${UID}:${GID}
+    volumes:
+      - ./sample:/var/www/html
+      - ./sample-dc:/usr/src/aidock/build
+      - ./sample-dc/extra.ini:/usr/local/etc/php/conf.d/extra.ini
+      - ./sample-dc/xdebug.ini:/usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
+      - ./sample-dc/.npm-appuser:/home/appuser/.npm
+      - ./sample-dc/.npm:/root/.npm
+      - ${HOME}/.composer:/home/appuser/.composer
+    env_file: ./sample-dc/.env
+    depends_on:
+      - sample-database
+
+  sample-nginx:
+    build:
+      context: ./sample-dc
+      dockerfile: generic-nginx.dockerfile
+    volumes:
+      - ./sample:/var/www/html
+      - ./sample-dc:/usr/src/aidock/build
+      - ./sample-dc/vhosts:/etc/nginx/templates
+      - ./sample-dc/log/nginx-error.log:/var/log/nginx/app-error.log
+      - ./sample-dc/log/nginx-access.log:/var/log/nginx/app-access.log
+    ports:
+      - "${WEB_MAPPED_PORT}:80"
+    env_file: ./sample-dc/.env
+    depends_on:
+      - sample
+
+  sample-database:
+    image: mysql:5.7.23
+    volumes:
+      - dbdata:/var/lib/mysql
+      - ./sample-dc/initdb:/docker-entrypoint-initdb.d/:ro
+    environment:
+      - "MYSQL_DATABASE=main"
+      - "MYSQL_USER=user"
+      - "MYSQL_PASSWORD=password"
+      - "MYSQL_ROOT_PASSWORD=password"
+    ports:
+      - "${DB_MAPPED_PORT}:3306"
+
+volumes:
+  dbdata:
